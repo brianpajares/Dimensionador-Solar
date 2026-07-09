@@ -1,0 +1,6 @@
+{
+  "name": "SolConfigura - Dimensionador Solar",
+  "description": "Evaluador solar y dimensionador fotovoltaico profesional para sistemas aislados (off-grid) y conectados a red (grid-tied) en Perú y Latinoamérica, con cálculo de BOM y propuesta financiera.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
