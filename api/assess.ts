@@ -1,4 +1,4 @@
-import { assessProject, sendJson } from './_shared';
+import { assessProject, sendJson } from './_shared.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
@@ -13,4 +13,3 @@ export default async function handler(req: any, res: any) {
     sendJson(res, 500, { error: 'Fallo durante el dimensionamiento del sistema solar: ' + err.message });
   }
 }
-
