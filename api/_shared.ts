@@ -1,6 +1,6 @@
-import { finance, selectEquipment, sizeGridTied, sizeOffGrid, ENGINE_VERSION } from '../src/lib/solar-engine';
-import { CATALOG_VERSION } from '../src/lib/catalog';
-import { FinanceScenario, ProjectAssessmentRequest, ProjectAssessmentResponse, SolarSiteData } from '../src/types';
+import { finance, selectEquipment, sizeGridTied, sizeOffGrid, ENGINE_VERSION } from '../src/lib/solar-engine.js';
+import { CATALOG_VERSION } from '../src/lib/catalog.js';
+import type { FinanceScenario, ProjectAssessmentRequest, ProjectAssessmentResponse, SolarSiteData } from '../src/types';
 
 const DATASOURCE_VERSION = 'pvgis-5.3+geographic-fallback-2026.08.10';
 
@@ -79,7 +79,7 @@ export async function getSolarSiteData(location: { lat: number; lon: number }): 
     }
 
     const daysInMonths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    const hspByMonth = monthlyOutputs.map((item: any, idx: number) => {
+    const hspByMonth = monthlyOutputs.slice(0, 12).map((item: any, idx: number) => {
       const hMonthKwh = (item.H_m_g || item.H_m || 0) / 1000;
       return Number((hMonthKwh / daysInMonths[idx]).toFixed(2));
     });
@@ -284,4 +284,3 @@ export async function assessProject(body: ProjectAssessmentRequest): Promise<Pro
     }
   };
 }
-
