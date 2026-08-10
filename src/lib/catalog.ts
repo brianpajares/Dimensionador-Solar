@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { CatalogItem } from '../types';
+import type { CatalogItem } from '../types';
 
 export const CATALOG_VERSION = 'catalog-pe-2026.08.10';
 const DEFAULT_PRICE_SOURCE = 'Benchmark mayorista Peru / importadores solares Lima';
@@ -111,7 +111,7 @@ const RAW_CATALOG: CatalogItem[] = [
     sku: 'PV18-1012-VPM',
     power_w: 1000,
     voltage_v: 12,
-    current_a: 40, // MPPT rating
+    current_a: 40,
     unit_price_usd: 245,
     active: true,
     meta: { max_pv_input_w: 625, peak_efficiency: 0.93 }
@@ -124,7 +124,7 @@ const RAW_CATALOG: CatalogItem[] = [
     sku: 'PV18-3024-VPM',
     power_w: 3000,
     voltage_v: 24,
-    current_a: 80, // MPPT rating
+    current_a: 80,
     unit_price_usd: 475,
     active: true,
     meta: { max_pv_input_w: 2000, peak_efficiency: 0.93 }
@@ -137,7 +137,7 @@ const RAW_CATALOG: CatalogItem[] = [
     sku: 'PV18-5048-VHM',
     power_w: 5000,
     voltage_v: 48,
-    current_a: 100, // MPPT rating
+    current_a: 100,
     unit_price_usd: 785,
     active: true,
     meta: { max_pv_input_w: 5000, peak_efficiency: 0.93 }
