@@ -31,6 +31,7 @@ import FinanceSummary from './components/FinanceSummary';
 import ProposalViewer from './components/ProposalViewer';
 import ValidationPanel from './components/ValidationPanel';
 import LeadCapture from './components/LeadCapture';
+import { MASTER_DATA_VERSION, MONETIZATION_PLANS } from './data/solar-master-data';
 
 export default function App() {
   const [currentStep, setCurrentStep] = useState<number>(1);
@@ -109,14 +110,14 @@ export default function App() {
       });
 
       if (!response.ok) {
-        throw new Error("No se pudo conectar al redactor de IA.");
+        throw new Error("No se pudo generar la propuesta local.");
       }
 
       const data = await response.json();
       setProposalText(data.text);
     } catch (err) {
       console.error(err);
-      alert("No pudimos generar el informe de IA. Usaremos la plantilla de respaldo.");
+      alert("No pudimos generar la propuesta local. Reintenta en unos segundos.");
     } finally {
       setProposalLoading(false);
     }
@@ -124,11 +125,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#05060A] text-slate-200 flex flex-col font-sans relative overflow-x-hidden">
-      {/* Mesh Gradients in the background */}
-      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full bg-blue-600/10 blur-[130px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[70%] h-[70%] rounded-full bg-purple-600/10 blur-[160px]" />
-        <div className="absolute top-[30%] right-[10%] w-[50%] h-[50%] rounded-full bg-amber-500/5 blur-[120px]" />
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <img src="/solar-hero.webp" alt="" className="h-full w-full object-cover opacity-35" />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,#05060A_0%,rgba(5,6,10,0.92)_34%,rgba(5,6,10,0.70)_68%,rgba(5,6,10,0.92)_100%)]" />
       </div>
 
       {/* 1. Global Header */}
@@ -144,11 +143,11 @@ export default function App() {
                   Sol<span className="text-amber-400 font-extrabold">Configura</span>
                 </span>
                 <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-full px-2 py-0.5 font-semibold">
-                  MVP v1.0
+                  Master Data
                 </span>
               </div>
               <p className="text-[10px] text-slate-400 font-medium">
-                Evaluador y Dimensionador Fotovoltaico Profesional para Perú & LatAm
+                Prefactibilidad solar, BOM y conversion comercial para Peru & LatAm
               </p>
             </div>
           </div>
@@ -159,15 +158,15 @@ export default function App() {
               <Compass className="h-4 w-4 text-amber-400" />
               <div>
                 <div className="text-[10px] text-slate-400 uppercase font-semibold">Base de Datos Solar</div>
-                <div className="font-bold text-slate-200">PVGIS 5.3 + fallback geogrÃ¡fico</div>
+                <div className="font-bold text-slate-200">Excel maestro local</div>
               </div>
             </div>
 
             <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-xl backdrop-blur-md">
               <FileCheck2 className="h-4 w-4 text-orange-400" />
               <div>
-                <div className="text-[10px] text-slate-400 uppercase font-semibold">Validado por</div>
-                <div className="font-bold text-slate-200">Ing. Brian Pajares (PMP)</div>
+                <div className="text-[10px] text-slate-400 uppercase font-semibold">Modo demo</div>
+                <div className="font-bold text-slate-200">Sin IA ni APIs externas</div>
               </div>
             </div>
           </div>
@@ -176,6 +175,35 @@ export default function App() {
 
       {/* 2. Main Workspace */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6 relative z-10">
+        <section className="min-h-[360px] flex items-end pt-12 pb-6">
+          <div className="max-w-4xl">
+            <div className="flex flex-wrap gap-2 mb-5">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-200 bg-emerald-500/15 border border-emerald-400/25 rounded-full px-3 py-1">
+                Fuente: {MASTER_DATA_VERSION}
+              </span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-200 bg-amber-500/15 border border-amber-400/25 rounded-full px-3 py-1">
+                Assessment en menos de 3 minutos
+              </span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-sky-200 bg-sky-500/15 border border-sky-400/25 rounded-full px-3 py-1">
+                Cotizacion + lead capture
+              </span>
+            </div>
+            <h1 className="text-4xl md:text-6xl font-black text-white leading-[1.02] max-w-4xl">
+              Convierte un consumo electrico en un proyecto solar vendible.
+            </h1>
+            <p className="text-base md:text-lg text-slate-200/90 mt-5 max-w-2xl leading-relaxed">
+              SolConfigura dimensiona sistemas solares con datos maestros auditables, BOM trazable, escenarios financieros y una accion comercial para cotizar o iniciar piloto.
+            </p>
+            <div className="mt-7 flex flex-wrap gap-3">
+              <button onClick={() => setCurrentStep(1)} className="px-5 py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-sm shadow-[0_12px_36px_rgba(245,158,11,0.25)]">
+                Iniciar assessment
+              </button>
+              <button onClick={() => { setSystemType('grid_tied'); setMonthlyKwh(650); setGridTariff(0.26); setCurrentStep(3); }} className="px-5 py-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-white font-bold text-sm">
+                Demo PyME conectado a red
+              </button>
+            </div>
+          </div>
+        </section>
         
         {/* Step Progress Bar Indicators */}
         <div className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl flex justify-between items-center overflow-x-auto shadow-lg gap-4">
@@ -249,7 +277,7 @@ export default function App() {
               <div className="h-12 w-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
               <div className="text-center">
                 <h4 className="text-sm font-semibold text-white">Dimensionando Sistema Solar...</h4>
-                <p className="text-xs text-slate-400 mt-1">Consultando bases de datos climáticos PVGIS y calculando flujos financieros.</p>
+                <p className="text-xs text-slate-400 mt-1">Consultando Excel maestro local y calculando flujos financieros sin IA ni APIs externas.</p>
               </div>
             </div>
           )}
@@ -665,15 +693,39 @@ export default function App() {
 
                 <LeadCapture assessment={assessmentResult} />
 
-                {/* 4. AI Proposal Generation Portal */}
+                <div className="bg-slate-950/70 border border-white/10 rounded-2xl p-6">
+                  <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-5">
+                    <div>
+                      <h3 className="text-base font-bold text-white">Modelo de monetizacion listo para vender</h3>
+                      <p className="text-xs text-slate-400 mt-1">
+                        El assessment gratis genera demanda; los reportes, instaladores y leads calificados convierten el trafico en ingresos.
+                      </p>
+                    </div>
+                    <span className="text-[10px] uppercase tracking-wider font-bold text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full">
+                      Revenue paths
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    {MONETIZATION_PLANS.map((plan) => (
+                      <div key={plan.id} className="rounded-xl bg-white/5 border border-white/10 p-4">
+                        <p className="text-white font-bold text-sm">{plan.name}</p>
+                        <p className="text-2xl font-black text-amber-300 mt-2">{plan.price}</p>
+                        <p className="text-[10px] uppercase tracking-wider text-slate-500 mt-2">{plan.target}</p>
+                        <p className="text-xs text-slate-300 mt-2 leading-relaxed">{plan.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 4. Local proposal generation portal */}
                 <div className="bg-white/5 border border-white/10 p-6 rounded-2xl flex flex-col items-center justify-center space-y-4 backdrop-blur-md shadow-[0_0_20px_rgba(245,158,11,0.05)]">
                   <div className="text-center max-w-md space-y-1.5">
                     <h3 className="text-base font-bold text-white flex items-center justify-center gap-1.5">
                       <Sparkles className="h-5 w-5 text-amber-500" />
-                      Redacción de Propuesta Comercial con IA
+                      Propuesta comercial generada desde datos maestros
                     </h3>
                     <p className="text-xs text-slate-300">
-                      Redacta un reporte formal y comercial de ingeniería para tu cliente, integrando el análisis geográfico y financiero mediante modelos inteligentes de IA.
+                      Genera un reporte formal usando solo el cálculo, el BOM y el Excel maestro. No requiere Gemini, OpenAI ni fuentes externas.
                     </p>
                   </div>
 
@@ -697,7 +749,7 @@ export default function App() {
                       className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-bold text-xs rounded-xl flex items-center gap-2 shadow-[0_0_15px_rgba(245,158,11,0.3)] transition-all cursor-pointer"
                     >
                       <Sparkles className="h-4.5 w-4.5 fill-slate-950" />
-                      Generar Documento Propuesta Formal
+                      Generar Propuesta Formal Local
                     </button>
                   )}
                 </div>
@@ -723,7 +775,7 @@ export default function App() {
         <footer className="text-center py-8 text-[11px] text-slate-400 space-y-2 border-t border-white/10 mt-12 leading-relaxed">
           <p>© 2026 SolConfigura Perú. Todos los derechos reservados. Diseñado por Brian Pajares / Zone Digital.</p>
           <p className="max-w-xl mx-auto">
-            AVISO: Los cálculos de este evaluador solar son estimaciones preliminares basadas en PVGIS 5.3 o fallback geográfico documentado; no sustituyen mediciones físicas ni diseño de ingeniería de detalle final obligatoria según Código Nacional de Electricidad (Perú).
+            AVISO: Los cálculos son estimaciones preliminares basadas en el Excel maestro SolConfigura; no usan IA ni fuentes externas en tiempo real y no sustituyen mediciones físicas ni diseño de ingeniería de detalle final obligatoria según Código Nacional de Electricidad (Perú).
           </p>
         </footer>
       </main>

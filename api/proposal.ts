@@ -1,10 +1,4 @@
-import { GoogleGenAI } from '@google/genai';
 import { sendJson } from './_shared.js';
-
-let ai: GoogleGenAI | null = null;
-if (process.env.GEMINI_API_KEY) {
-  ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-}
 
 function fallbackProposal(designSummary: any) {
   const isOffgrid = designSummary.systemType === 'offgrid';
@@ -38,24 +32,7 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
-    let text = '';
-    if (ai) {
-      try {
-        const response = await ai.models.generateContent({
-          model: 'gemini-3.5-flash',
-          contents: `Redacta una propuesta solar profesional en espanol usando solo estos datos calculados: ${JSON.stringify(designSummary).slice(0, 12000)}. Incluye resumen ejecutivo, diseno tecnico, consideraciones comerciales y disclaimer de prefactibilidad. Maximo 450 palabras.`,
-          config: {
-            temperature: 0.55,
-            systemInstruction: 'Eres un ingeniero solar senior. No inventes datos; solo explica los calculos recibidos.'
-          }
-        });
-        text = response.text || '';
-      } catch {
-        text = '';
-      }
-    }
-
-    sendJson(res, 200, { text: text || fallbackProposal(designSummary) });
+    sendJson(res, 200, { text: fallbackProposal(designSummary), source: 'local_template_no_ai' });
   } catch (err: any) {
     sendJson(res, 500, { error: 'Fallo al redactar la propuesta tecnica: ' + err.message });
   }

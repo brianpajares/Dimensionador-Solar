@@ -111,7 +111,7 @@ export interface SolarSiteData {
   specificYield?: number; // for grid_tied, in kWh/kWp/year
   optimalTilt?: number;
   optimalAzimuth?: number;
-  source: 'pvgis' | 'nasa_power' | 'google_solar' | 'estimated';
+  source: 'pvgis' | 'nasa_power' | 'google_solar' | 'estimated' | 'master_excel';
   fetchedAt?: string;
   confidence?: 'high' | 'medium' | 'low';
   limitations?: string[];

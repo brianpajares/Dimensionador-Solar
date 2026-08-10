@@ -1,123 +1,32 @@
 import { finance, selectEquipment, sizeGridTied, sizeOffGrid, ENGINE_VERSION } from '../src/lib/solar-engine.js';
 import { CATALOG_VERSION } from '../src/lib/catalog.js';
+import { MASTER_DATA_SOURCE, MASTER_DATA_VERSION, nearestSolarRegion } from '../src/data/solar-master-data.js';
 import type { FinanceScenario, ProjectAssessmentRequest, ProjectAssessmentResponse, SolarSiteData } from '../src/types';
 
-const DATASOURCE_VERSION = 'pvgis-5.3+geographic-fallback-2026.08.10';
+const DATASOURCE_VERSION = MASTER_DATA_VERSION;
 
 export function sendJson(res: any, status: number, payload: unknown) {
   res.status(status).setHeader('Content-Type', 'application/json');
   res.end(JSON.stringify(payload));
 }
 
-function estimatePeruSolar(lat: number, lon: number): SolarSiteData {
-  const isHighAndes = lon >= -78.0 && lon <= -69.0 && lat >= -18.0 && lat <= -5.0;
-  const isCoast = lon >= -81.5 && lon <= -75.0 && lat >= -14.0 && lat <= -6.0;
-  const isJungle = lon >= -75.0 && lon <= -69.0 && lat >= -6.0 && lat <= -1.0;
-
-  let hspWorstMonth = 4.2;
-  let hspAnnualAvg = 5.0;
-  let optimalTilt = 12;
-
-  if (isHighAndes) {
-    hspWorstMonth = 4.8;
-    hspAnnualAvg = 5.7;
-    optimalTilt = Math.abs(lat) + 3;
-  } else if (isCoast) {
-    if (lat < -11) {
-      hspWorstMonth = 5.2;
-      hspAnnualAvg = 6.0;
-    } else {
-      hspWorstMonth = 3.6;
-      hspAnnualAvg = 4.5;
-    }
-    optimalTilt = Math.abs(lat) + 2;
-  } else if (isJungle) {
-    hspWorstMonth = 3.9;
-    hspAnnualAvg = 4.6;
-    optimalTilt = 8;
-  } else {
-    hspWorstMonth = Math.max(3.5, 4.5 - Math.abs(lat) * 0.05);
-    hspAnnualAvg = Math.max(4.2, 5.2 - Math.abs(lat) * 0.03);
-    optimalTilt = Math.max(10, Math.abs(lat) + 2);
-  }
-
-  const isNorthernHemisphere = lat > 0;
-  const hspByMonth = Array.from({ length: 12 }, (_, m) => {
-    const phase = isNorthernHemisphere ? m : (m + 6) % 12;
-    const factor = Math.cos((phase - 6) * Math.PI / 6);
-    const monthVal = hspAnnualAvg + (hspAnnualAvg - hspWorstMonth) * factor * 0.8;
-    return Number(Math.max(hspWorstMonth, Math.min(6.8, monthVal)).toFixed(2));
-  });
-
-  return {
-    hspByMonth,
-    hspWorstMonth: Number(hspWorstMonth.toFixed(2)),
-    hspAnnualAvg: Number(hspAnnualAvg.toFixed(2)),
-    specificYield: Number((hspAnnualAvg * 365 * 0.8).toFixed(1)),
-    optimalTilt: Math.round(optimalTilt),
-    optimalAzimuth: isNorthernHemisphere ? 180 : 0,
-    source: 'estimated',
-    fetchedAt: new Date().toISOString(),
-    confidence: 'medium',
-    limitations: ['Fallback geografico usado por indisponibilidad de PVGIS; requiere verificacion de recurso solar para propuesta final.']
-  };
-}
-
 export async function getSolarSiteData(location: { lat: number; lon: number }): Promise<SolarSiteData> {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5500);
-    const mrUrl = `https://re.jrc.ec.europa.eu/api/v5_3/MRcalc?lat=${location.lat}&lon=${location.lon}&horirrad=1&outputformat=json`;
-    const mrResponse = await fetch(mrUrl, { signal: controller.signal });
-    clearTimeout(timeoutId);
-
-    if (!mrResponse.ok) throw new Error(`PVGIS MRcalc returned ${mrResponse.status}`);
-    const mrData = await mrResponse.json();
-    const monthlyOutputs = mrData?.outputs?.monthly;
-    if (!Array.isArray(monthlyOutputs) || monthlyOutputs.length === 0) {
-      throw new Error('Invalid PVGIS monthly response');
-    }
-
-    const daysInMonths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    const hspByMonth = monthlyOutputs.slice(0, 12).map((item: any, idx: number) => {
-      const hMonthKwh = (item.H_m_g || item.H_m || 0) / 1000;
-      return Number((hMonthKwh / daysInMonths[idx]).toFixed(2));
-    });
-
-    const hspWorstMonth = Math.min(...hspByMonth);
-    const hspAnnualAvg = hspByMonth.reduce((a, b) => a + b, 0) / 12;
-    let specificYield = hspAnnualAvg * 365 * 0.78;
-    let optimalTilt = Math.abs(location.lat);
-    let optimalAzimuth = location.lat > 0 ? 180 : 0;
-
-    try {
-      const pvUrl = `https://re.jrc.ec.europa.eu/api/v5_3/PVcalc?lat=${location.lat}&lon=${location.lon}&peakpower=1&loss=14&mountingplace=building&optimalangles=1&outputformat=json`;
-      const pvRes = await fetch(pvUrl);
-      if (pvRes.ok) {
-        const pvData = await pvRes.json();
-        specificYield = pvData?.outputs?.totals?.fixed?.E_y || specificYield;
-        optimalTilt = pvData?.inputs?.mounting_system?.fixed?.slope?.value ?? optimalTilt;
-        optimalAzimuth = pvData?.inputs?.mounting_system?.fixed?.azimuth?.value ?? optimalAzimuth;
-      }
-    } catch {
-      // PVcalc is helpful but not required for a usable pre-feasibility result.
-    }
-
-    return {
-      hspByMonth,
-      hspWorstMonth: Number(hspWorstMonth.toFixed(2)),
-      hspAnnualAvg: Number(hspAnnualAvg.toFixed(2)),
-      specificYield: Number(specificYield.toFixed(1)),
-      optimalTilt: Math.round(optimalTilt),
-      optimalAzimuth: Math.round(optimalAzimuth),
-      source: 'pvgis',
-      fetchedAt: new Date().toISOString(),
-      confidence: 'high',
-      limitations: ['Prefactibilidad automatizada; no incluye sombras, area util de techo, estructura ni visita tecnica.']
-    };
-  } catch {
-    return estimatePeruSolar(location.lat, location.lon);
-  }
+  const region = nearestSolarRegion(location.lat, location.lon);
+  return {
+    hspByMonth: region.hspByMonth,
+    hspWorstMonth: region.hspWorstMonth,
+    hspAnnualAvg: region.hspAnnualAvg,
+    specificYield: region.specificYield,
+    optimalTilt: region.optimalTilt,
+    optimalAzimuth: region.optimalAzimuth,
+    source: 'master_excel',
+    fetchedAt: new Date().toISOString(),
+    confidence: region.confidence,
+    limitations: [
+      `Dato maestro local: ${MASTER_DATA_SOURCE}, region seleccionada: ${region.name}.`,
+      'No usa PVGIS, NASA, Google Solar ni IA. Requiere visita tecnica para ingenieria final.'
+    ]
+  };
 }
 
 function buildFinanceScenarios(input: {
@@ -207,7 +116,7 @@ export async function assessProject(body: ProjectAssessmentRequest): Promise<Pro
     if (bom.some((item) => item.category === 'inverter_offgrid' && item.quantity > 1)) {
       warnings.push('La potencia exige inversores en paralelo; validar compatibilidad del fabricante y protecciones antes de ofertar.');
     }
-    if (siteSolar.source === 'estimated') warnings.push('PVGIS no respondio; se uso estimador geografico.');
+    warnings.push(`Datos solares cargados desde ${MASTER_DATA_SOURCE}; no se consultaron fuentes externas.`);
 
     design = {
       systemVoltage: offgridRes.systemVoltage,
@@ -261,7 +170,7 @@ export async function assessProject(body: ProjectAssessmentRequest): Promise<Pro
     };
   }
 
-  const confidenceScore = Math.max(55, Math.min(92, (siteSolar.source === 'pvgis' ? 86 : 68) - Math.max(0, warnings.length - 1) * 6));
+  const confidenceScore = Math.max(65, Math.min(90, (siteSolar.confidence === 'high' ? 86 : 74) - Math.max(0, warnings.length - 1) * 4));
 
   return {
     projectId,
