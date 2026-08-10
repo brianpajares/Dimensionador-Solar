@@ -12,7 +12,6 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  // MVP production-safe acknowledgement. Connect this to Postgres/CRM for durable monetization.
   sendJson(res, 200, {
     ok: true,
     leadId: 'LEAD_' + Math.random().toString(36).substring(2, 10).toUpperCase(),

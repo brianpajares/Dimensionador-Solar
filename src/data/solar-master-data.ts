@@ -56,10 +56,10 @@ export const TARIFFS = [
 ];
 
 export const MONETIZATION_PLANS = [
-  { id: 'free', name: 'Assessment gratis', price: '$0', target: 'Hogar o negocio', value: 'Prefactibilidad basica y BOM estimado' },
-  { id: 'pro_report', name: 'Reporte premium', price: '$29', target: 'Cliente final', value: 'PDF comercial, escenarios y checklist tecnico' },
-  { id: 'installer_saas', name: 'Installer Pro', price: '$99/mes', target: 'Instaladores', value: 'Leads, white-label, catalogo y pipeline' },
-  { id: 'qualified_lead', name: 'Lead calificado', price: '3%-5% success fee', target: 'Instaladores/financieras', value: 'Proyecto listo para cotizar' }
+  { id: 'free', name: 'Diagnostico solar', price: '$0', target: 'Hogar o negocio', value: 'Dimensionamiento inicial, costo estimado y potencial de ahorro' },
+  { id: 'pro_report', name: 'Reporte comercial', price: '$29', target: 'Cliente final', value: 'PDF para decidir: BOM, escenarios financieros y checklist tecnico' },
+  { id: 'installer_saas', name: 'SolConfigura Pro', price: '$99/mes', target: 'Instaladores', value: 'Pipeline de oportunidades, catalogo y propuestas para vender mas rapido' },
+  { id: 'qualified_lead', name: 'Proyecto para instalar', price: '3%-5% success fee', target: 'Instaladores/financieras', value: 'Cliente calificado con consumo, ubicacion, CAPEX y propuesta preliminar' }
 ];
 
 export const DEFAULT_ASSUMPTIONS = {
