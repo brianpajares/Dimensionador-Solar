@@ -1,4 +1,4 @@
-import { sendJson } from './_shared';
+import { sendJson } from './_shared.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
@@ -19,4 +19,3 @@ export default async function handler(req: any, res: any) {
     message: 'Solicitud registrada. Un asesor puede priorizar este proyecto.'
   });
 }
-
