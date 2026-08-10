@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { DollarSign, TrendingUp, Calendar, Percent, Landmark, ChartColumnIncreasing } from 'lucide-react';
 import { motion } from 'motion/react';
+import { FinanceScenario } from '../types';
 
 interface FinanceSummaryProps {
   finance: {
@@ -15,6 +16,7 @@ interface FinanceSummaryProps {
     npvUsd: number;
     irrPct: number;
     cashFlows: number[];
+    scenarios: FinanceScenario[];
   };
   systemType: 'offgrid' | 'grid_tied';
 }
@@ -141,6 +143,47 @@ export default function FinanceSummary({ finance, systemType }: FinanceSummaryPr
           </div>
         </div>
       </div>
+
+      {finance.scenarios?.length > 0 && (
+        <div className="border border-white/10 rounded-2xl p-5 bg-white/5 backdrop-blur-md">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+            <div>
+              <h4 className="text-sm font-semibold text-white">Escenarios financieros comparables</h4>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Sensibilidad del caso de inversion ante precio, tarifa, degradacion y tasa de descuento.
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {finance.scenarios.map((scenario) => (
+              <div key={scenario.label} className="bg-slate-950/60 border border-white/10 rounded-xl p-4">
+                <div className="flex items-center justify-between">
+                  <h5 className="text-white font-bold text-sm">{scenario.label}</h5>
+                  <span className="text-[10px] text-slate-400 font-mono">{(scenario.assumptions.discountPct * 100).toFixed(0)}% disc.</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3 mt-3 text-xs">
+                  <div>
+                    <p className="text-slate-500 text-[10px] uppercase font-bold">CAPEX</p>
+                    <p className="text-slate-100 font-mono">${scenario.capexUsd.toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500 text-[10px] uppercase font-bold">Ahorro</p>
+                    <p className="text-emerald-300 font-mono">${scenario.annualSavingsUsd.toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500 text-[10px] uppercase font-bold">Payback</p>
+                    <p className="text-amber-300 font-mono">{scenario.paybackYears} anos</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500 text-[10px] uppercase font-bold">IRR</p>
+                    <p className="text-indigo-300 font-mono">{scenario.irrPct}%</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* SVG Interactive Financial Chart */}
       <div className="border border-white/10 rounded-2xl p-5 bg-white/5 backdrop-blur-md shadow-2xl">

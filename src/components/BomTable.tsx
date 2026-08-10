@@ -72,6 +72,7 @@ export default function BomTable({ bom }: BomTableProps) {
               <tr className="bg-white/10 text-white text-[11px] font-semibold uppercase tracking-wider border-b border-white/10">
                 <th className="py-3.5 px-4 w-44">Categoría</th>
                 <th className="py-3.5 px-4">Descripción del Equipo</th>
+                <th className="py-3.5 px-4 w-40">Trazabilidad</th>
                 <th className="py-3.5 px-4 text-center w-16">Cant.</th>
                 <th className="py-3.5 px-4 text-right w-24">P. Unit ($)</th>
                 <th className="py-3.5 px-4 text-right w-28">Total ($ USD)</th>
@@ -88,6 +89,12 @@ export default function BomTable({ bom }: BomTableProps) {
                   </td>
                   <td className="py-3 px-4 font-medium text-white">
                     {item.description}
+                  </td>
+                  <td className="py-3 px-4 text-[10px] text-slate-400 leading-relaxed">
+                    <p className="font-semibold text-slate-300">{item.supplier || 'Proveedor por confirmar'}</p>
+                    <p>{item.country || 'PE'} | {item.last_verified_at || 'sin fecha'}</p>
+                    <p>{item.source || 'Benchmark de mercado'}</p>
+                    {item.notes && <p className="text-amber-300 mt-1">{item.notes}</p>}
                   </td>
                   <td className="py-3 px-4 text-center font-mono font-medium text-slate-200">
                     {item.quantity}

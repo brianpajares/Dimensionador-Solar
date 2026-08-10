@@ -72,6 +72,11 @@ export interface CatalogItem {
   current_a?: number;
   chemistry?: 'lifepo4' | 'agm' | 'gel';
   unit_price_usd: number;
+  supplier?: string;
+  country?: string;
+  source?: string;
+  last_verified_at?: string;
+  valid_until?: string;
   active: boolean;
   meta?: Record<string, any>;
 }
@@ -83,6 +88,12 @@ export interface BomItem {
   quantity: number;
   unit_price_usd: number;
   line_total_usd: number;
+  supplier?: string;
+  country?: string;
+  source?: string;
+  last_verified_at?: string;
+  valid_until?: string;
+  notes?: string;
 }
 
 export interface FinancialResult {
@@ -101,6 +112,9 @@ export interface SolarSiteData {
   optimalTilt?: number;
   optimalAzimuth?: number;
   source: 'pvgis' | 'nasa_power' | 'google_solar' | 'estimated';
+  fetchedAt?: string;
+  confidence?: 'high' | 'medium' | 'low';
+  limitations?: string[];
 }
 
 export interface ProjectAssessmentRequest {
@@ -113,6 +127,21 @@ export interface ProjectAssessmentRequest {
   monthlyKwh?: number;
   tariffUsdPerKwh?: number;
   systemVoltage?: 12 | 24 | 48;
+}
+
+export interface FinanceScenario {
+  label: string;
+  capexUsd: number;
+  annualSavingsUsd: number;
+  paybackYears: number;
+  npvUsd: number;
+  irrPct: number;
+  assumptions: {
+    tariffUsdPerKwh: number;
+    capexMultiplier: number;
+    degradationPct: number;
+    discountPct: number;
+  };
 }
 
 export interface ProjectAssessmentResponse {
@@ -141,5 +170,16 @@ export interface ProjectAssessmentResponse {
     npvUsd: number;
     irrPct: number;
     cashFlows: number[];
+    scenarios: FinanceScenario[];
+  };
+  meta: {
+    engineVersion: string;
+    catalogVersion: string;
+    datasourceVersion: string;
+    createdAt: string;
+    confidenceScore: number;
+    warnings: string[];
+    assumptions: string[];
+    nextAction: 'quote_request' | 'engineering_review' | 'pilot_request';
   };
 }

@@ -5,7 +5,12 @@
 
 import { CatalogItem } from '../types';
 
-export const CATALOG: CatalogItem[] = [
+export const CATALOG_VERSION = 'catalog-pe-2026.08.10';
+const DEFAULT_PRICE_SOURCE = 'Benchmark mayorista Peru / importadores solares Lima';
+const DEFAULT_LAST_VERIFIED = '2026-08-10';
+const DEFAULT_VALID_UNTIL = '2026-09-10';
+
+const RAW_CATALOG: CatalogItem[] = [
   // --- PANELS (Paneles Solares) ---
   {
     id: 'panel-jinko-550',
@@ -56,6 +61,19 @@ export const CATALOG: CatalogItem[] = [
     unit_price_usd: 295,
     active: true,
     meta: { weight_kg: 60, max_cycles_50_dod: 1200 }
+  },
+  {
+    id: 'battery-eco-worthy-12v-100ah-lfp',
+    category: 'battery',
+    brand: 'Eco-Worthy',
+    model: 'Bateria LiFePO4 12V 100Ah con BMS',
+    sku: 'LFP12-100-BMS',
+    capacity_wh: 1280,
+    voltage_v: 12,
+    chemistry: 'lifepo4',
+    unit_price_usd: 285,
+    active: true,
+    meta: { weight_kg: 11, max_cycles_80_dod: 4000, bms: true }
   },
   {
     id: 'battery-pylontech-24v-100ah',
@@ -258,3 +276,12 @@ export const CATALOG: CatalogItem[] = [
     meta: { interface: 'RS232/USB', cloud_app: 'SmartESS' }
   }
 ];
+
+export const CATALOG: CatalogItem[] = RAW_CATALOG.map((item) => ({
+  supplier: 'ZoneSolar Partner Network',
+  country: 'PE',
+  source: DEFAULT_PRICE_SOURCE,
+  last_verified_at: DEFAULT_LAST_VERIFIED,
+  valid_until: DEFAULT_VALID_UNTIL,
+  ...item
+}));

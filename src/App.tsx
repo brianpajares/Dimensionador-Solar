@@ -29,6 +29,8 @@ import SystemResultCard from './components/SystemResultCard';
 import BomTable from './components/BomTable';
 import FinanceSummary from './components/FinanceSummary';
 import ProposalViewer from './components/ProposalViewer';
+import ValidationPanel from './components/ValidationPanel';
+import LeadCapture from './components/LeadCapture';
 
 export default function App() {
   const [currentStep, setCurrentStep] = useState<number>(1);
@@ -157,7 +159,7 @@ export default function App() {
               <Compass className="h-4 w-4 text-amber-400" />
               <div>
                 <div className="text-[10px] text-slate-400 uppercase font-semibold">Base de Datos Solar</div>
-                <div className="font-bold text-slate-200">PVGIS 5.3 + NASA Power</div>
+                <div className="font-bold text-slate-200">PVGIS 5.3 + fallback geogrÃ¡fico</div>
               </div>
             </div>
 
@@ -650,6 +652,8 @@ export default function App() {
                   worstMonthHsp={assessmentResult.site.hspWorstMonth}
                 />
 
+                <ValidationPanel assessment={assessmentResult} />
+
                 {/* 2. BOM Table component */}
                 <BomTable bom={assessmentResult.bom} />
 
@@ -658,6 +662,8 @@ export default function App() {
                   finance={assessmentResult.finance}
                   systemType={systemType}
                 />
+
+                <LeadCapture assessment={assessmentResult} />
 
                 {/* 4. AI Proposal Generation Portal */}
                 <div className="bg-white/5 border border-white/10 p-6 rounded-2xl flex flex-col items-center justify-center space-y-4 backdrop-blur-md shadow-[0_0_20px_rgba(245,158,11,0.05)]">
@@ -717,7 +723,7 @@ export default function App() {
         <footer className="text-center py-8 text-[11px] text-slate-400 space-y-2 border-t border-white/10 mt-12 leading-relaxed">
           <p>© 2026 SolConfigura Perú. Todos los derechos reservados. Diseñado por Brian Pajares / Zone Digital.</p>
           <p className="max-w-xl mx-auto">
-            AVISO: Los cálculos de este evaluador solar son estimaciones preliminares basadas en modelos matemáticos e históricos satelitales (PVGIS/NASA) y no sustituyen las mediciones físicas y diseño de ingeniería de detalle final obligatoria según Código Nacional de Electricidad (Perú).
+            AVISO: Los cálculos de este evaluador solar son estimaciones preliminares basadas en PVGIS 5.3 o fallback geográfico documentado; no sustituyen mediciones físicas ni diseño de ingeniería de detalle final obligatoria según Código Nacional de Electricidad (Perú).
           </p>
         </footer>
       </main>

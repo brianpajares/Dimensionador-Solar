@@ -8,9 +8,9 @@ import path from 'path';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
-import { sizeOffGrid, sizeGridTied, finance, selectEquipment } from './src/lib/solar-engine';
-import { CATALOG } from './src/lib/catalog';
-import { ProjectAssessmentRequest, ProjectAssessmentResponse, SolarSiteData } from './src/types';
+import { sizeOffGrid, sizeGridTied, finance, selectEquipment, ENGINE_VERSION } from './src/lib/solar-engine';
+import { CATALOG, CATALOG_VERSION } from './src/lib/catalog';
+import { FinanceScenario, ProjectAssessmentRequest, ProjectAssessmentResponse, SolarSiteData } from './src/types';
 
 // Load environment variables if in local development
 import dotenv from 'dotenv';
@@ -18,6 +18,7 @@ dotenv.config();
 
 const app = express();
 const PORT = 3000;
+const DATASOURCE_VERSION = 'pvgis-5.3+geographic-fallback-2026.08.10';
 
 app.use(express.json());
 
@@ -43,6 +44,7 @@ if (process.env.GEMINI_API_KEY) {
 
 // Global cache file path
 const CACHE_FILE = path.join(process.cwd(), 'irradiance_cache.json');
+const LEADS_FILE = path.join(process.cwd(), 'solconfigura_leads.jsonl');
 
 // Helper to read cache
 function readCache(): Record<string, SolarSiteData> {
@@ -63,6 +65,51 @@ function writeCache(cache: Record<string, SolarSiteData>) {
   } catch (err) {
     console.error("Failed to write irradiance cache:", err);
   }
+}
+
+function appendJsonLine(filePath: string, payload: Record<string, any>) {
+  fs.appendFileSync(filePath, JSON.stringify({ ...payload, receivedAt: new Date().toISOString() }) + '\n', 'utf8');
+}
+
+function buildFinanceScenarios(input: {
+  capexUsd: number;
+  systemType: ProjectAssessmentRequest['systemType'];
+  annualSelfConsumedKwh: number;
+  tariffUsdPerKwh: number;
+}): FinanceScenario[] {
+  const scenarioDefs = [
+    { label: 'Conservador', capexMultiplier: 1.10, tariffMultiplier: 0.90, degradationPct: 0.008, discountPct: 0.12 },
+    { label: 'Base', capexMultiplier: 1.00, tariffMultiplier: 1.00, degradationPct: 0.005, discountPct: 0.10 },
+    { label: 'Optimista', capexMultiplier: 0.95, tariffMultiplier: 1.10, degradationPct: 0.003, discountPct: 0.09 }
+  ];
+
+  return scenarioDefs.map((def) => {
+    const capexUsd = Math.round(input.capexUsd * def.capexMultiplier);
+    const tariffUsdPerKwh = input.tariffUsdPerKwh * def.tariffMultiplier;
+    const result = finance({
+      capexUsd,
+      systemType: input.systemType,
+      annualSelfConsumedKwh: input.annualSelfConsumedKwh,
+      tariffUsdPerKwh,
+      degradationPct: def.degradationPct,
+      discountPct: def.discountPct
+    });
+
+    return {
+      label: def.label,
+      capexUsd,
+      annualSavingsUsd: Math.round(result.annualSavings),
+      paybackYears: result.paybackYears,
+      npvUsd: result.npv,
+      irrPct: result.irr,
+      assumptions: {
+        tariffUsdPerKwh: Number(tariffUsdPerKwh.toFixed(3)),
+        capexMultiplier: def.capexMultiplier,
+        degradationPct: def.degradationPct,
+        discountPct: def.discountPct
+      }
+    };
+  });
 }
 
 /**
@@ -133,13 +180,43 @@ function estimatePeruSolar(lat: number, lon: number): SolarSiteData {
     specificYield: parseFloat((hspAnnualAvg * 365 * 0.80).toFixed(1)), // HSP -> specific yield with standard PR losses
     optimalTilt: Math.round(optimalTilt),
     optimalAzimuth: isNorthernHemisphere ? 180 : 0, // South-facing in North, North-facing in South
-    source: 'estimated'
+    source: 'estimated',
+    fetchedAt: new Date().toISOString(),
+    confidence: 'medium',
+    limitations: ['Fallback geografico usado por indisponibilidad de PVGIS; requiere verificacion de recurso solar para propuesta final.']
   };
 }
 
 // 1. GET CATALOG ENDPOINT
 app.get('/api/catalog', (req, res) => {
   res.json(CATALOG);
+});
+
+app.post('/api/leads', (req, res) => {
+  try {
+    const { projectId, action, name, email, phone, company, message, consent, rating, wouldUseForQuote } = req.body || {};
+    if (!projectId || !action || consent !== true) {
+      res.status(400).json({ error: 'Se requiere projectId, accion y consentimiento para registrar el lead.' });
+      return;
+    }
+
+    appendJsonLine(LEADS_FILE, {
+      projectId,
+      action,
+      name: name || '',
+      email: email || '',
+      phone: phone || '',
+      company: company || '',
+      message: message || '',
+      rating: Number(rating || 0),
+      wouldUseForQuote: Boolean(wouldUseForQuote),
+      source: 'web_app'
+    });
+
+    res.json({ ok: true, message: 'Solicitud registrada. Un asesor puede priorizar este proyecto.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'No se pudo registrar la solicitud: ' + err.message });
+  }
 });
 
 // 2. ASSESS SOLAR PROJECT ENDPOINT (WITH CORS BYPASS PROXIES)
@@ -234,7 +311,10 @@ app.post('/api/assess', async (req, res) => {
           specificYield: parseFloat(specificYield.toFixed(1)),
           optimalTilt: Math.round(optimalTilt),
           optimalAzimuth: Math.round(optimalAzimuth),
-          source: 'pvgis'
+          source: 'pvgis',
+          fetchedAt: new Date().toISOString(),
+          confidence: 'high',
+          limitations: ['Prefactibilidad automatizada; no incluye sombras, area util de techo, estructura ni visita tecnica.']
         };
 
         // Save to cache
@@ -255,6 +335,14 @@ app.post('/api/assess', async (req, res) => {
     let design: any = {};
     let bom: any[] = [];
     let fin: any = {};
+    const warnings: string[] = [
+      'Resultado de prefactibilidad: requiere visita tecnica, validacion estructural y diseno electrico final antes de comprar equipos.'
+    ];
+    const assumptions: string[] = [
+      'Perdidas PV de referencia: 25% off-grid y 14-22% grid-tied segun etapa de calculo.',
+      'Horizonte financiero: 20 anos, degradacion base 0.5% anual, descuento base 10%.',
+      'Precios de catalogo son benchmarks mayoristas y deben reconfirmarse antes de cotizar formalmente.'
+    ];
 
     if (systemType === 'offgrid') {
       const appliances = (body.appliances || []).map((app, i) => ({
@@ -303,6 +391,20 @@ app.post('/api/assess', async (req, res) => {
         annualSelfConsumedKwh,
         tariffUsdPerKwh: body.tariffUsdPerKwh || 0.35, // default off-grid avoided cost
       });
+      const scenarios = buildFinanceScenarios({
+        capexUsd,
+        systemType,
+        annualSelfConsumedKwh,
+        tariffUsdPerKwh: body.tariffUsdPerKwh || 0.35
+      });
+
+      const inverterItems = bom.filter(item => item.category === 'inverter_offgrid');
+      if (inverterItems.some(item => item.quantity > 1)) {
+        warnings.push('La potencia exige inversores en paralelo; validar compatibilidad del fabricante y protecciones antes de ofertar.');
+      }
+      if (siteSolar.source === 'estimated') {
+        warnings.push('PVGIS no respondio; se uso estimador geografico. La confianza comercial baja hasta verificar datos solares.');
+      }
 
       design = {
         systemVoltage: offgridRes.systemVoltage,
@@ -323,7 +425,8 @@ app.post('/api/assess', async (req, res) => {
         paybackYears: finRes.paybackYears,
         npvUsd: finRes.npv,
         irrPct: finRes.irr,
-        cashFlows: finRes.cashFlows
+        cashFlows: finRes.cashFlows,
+        scenarios
       };
 
     } else {
@@ -353,6 +456,20 @@ app.post('/api/assess', async (req, res) => {
         annualSelfConsumedKwh,
         tariffUsdPerKwh: body.tariffUsdPerKwh || 0.22 // default grid avoided cost
       });
+      const scenarios = buildFinanceScenarios({
+        capexUsd,
+        systemType,
+        annualSelfConsumedKwh,
+        tariffUsdPerKwh: body.tariffUsdPerKwh || 0.22
+      });
+
+      const inverterItems = bom.filter(item => item.category === 'inverter_grid');
+      if (inverterItems.some(item => item.quantity > 1) || gridRes.inverterKw > 10) {
+        warnings.push('Proyecto grid-tied comercial sobre 10 kW: requiere validacion trifasica, protecciones, area disponible e interconexion.');
+      }
+      if (monthlyKwh > 1200) {
+        warnings.push('Consumo mensual alto: recomendar revision B2B por instalador para confirmar demanda, fases y perfil horario.');
+      }
 
       design = {
         arrayPowerWp: Math.round(gridRes.kWp * 1000),
@@ -367,9 +484,15 @@ app.post('/api/assess', async (req, res) => {
         paybackYears: finRes.paybackYears,
         npvUsd: finRes.npv,
         irrPct: finRes.irr,
-        cashFlows: finRes.cashFlows
+        cashFlows: finRes.cashFlows,
+        scenarios
       };
     }
+
+    const confidenceScore = Math.max(
+      55,
+      Math.min(92, (siteSolar.source === 'pvgis' ? 86 : 68) - Math.max(0, warnings.length - 1) * 6)
+    );
 
     const response: ProjectAssessmentResponse = {
       projectId,
@@ -379,7 +502,17 @@ app.post('/api/assess', async (req, res) => {
       site: siteSolar,
       design,
       bom,
-      finance: fin
+      finance: fin,
+      meta: {
+        engineVersion: ENGINE_VERSION,
+        catalogVersion: CATALOG_VERSION,
+        datasourceVersion: DATASOURCE_VERSION,
+        createdAt: new Date().toISOString(),
+        confidenceScore,
+        warnings,
+        assumptions,
+        nextAction: confidenceScore >= 80 ? 'quote_request' : 'engineering_review'
+      }
     };
 
     res.json(response);

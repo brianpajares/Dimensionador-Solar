@@ -4,7 +4,9 @@
  */
 
 import { Appliance, OffGridInput, OffGridResult, GridTiedInput, GridTiedResult, FinancialResult, CatalogItem, BomItem, SystemType } from '../types';
-import { CATALOG } from './catalog';
+import { CATALOG, CATALOG_VERSION } from './catalog';
+
+export const ENGINE_VERSION = 'solar-engine-2026.08.10';
 
 // Constants specified in PRD Section 7.3
 export const ETA_INVERTER = 0.90;      // inverter efficiency
@@ -13,6 +15,22 @@ export const ETA_PV_PATH = 0.75;       // MPPT charge, wiring, dust, temp losses
 export const OVERSIZE_PV = 1.15;       // safety margin for cloudy days
 export const CTRL_MARGIN = 1.25;       // MPPT safety factor
 export const INV_SURGE = 1.25;         // inverter startup surge factor
+
+function toBomItem(item: CatalogItem, quantity: number, description?: string, notes?: string): BomItem {
+  return {
+    category: item.category,
+    description: description || `${item.brand} ${item.model} (${item.sku})`,
+    quantity,
+    unit_price_usd: item.unit_price_usd,
+    line_total_usd: quantity * item.unit_price_usd,
+    supplier: item.supplier,
+    country: item.country,
+    source: item.source,
+    last_verified_at: item.last_verified_at,
+    valid_until: item.valid_until,
+    notes
+  };
+}
 
 /**
  * Calculates total AC Wh/day from a list of appliances
@@ -203,13 +221,7 @@ export function selectEquipment(params: {
     // 1. Panel selection
     const panel = CATALOG.find(item => item.id === 'panel-jinko-550')!;
     const nPanels = Math.ceil(res.arrayWp / (panel.power_w || 550));
-    bom.push({
-      category: 'panel',
-      description: `${panel.brand} ${panel.model} (${panel.sku})`,
-      quantity: nPanels,
-      unit_price_usd: panel.unit_price_usd,
-      line_total_usd: nPanels * panel.unit_price_usd
-    });
+    bom.push(toBomItem(panel, nPanels));
 
     // 2. Battery selection
     let selectedBattery: CatalogItem;
@@ -217,9 +229,8 @@ export function selectEquipment(params: {
 
     if (chemistry === 'lifepo4') {
       if (res.systemVoltage === 12) {
-        // Fallback to high-quality Gel for 12V as Lithium typically is 24V/48V in catalog
-        selectedBattery = CATALOG.find(item => item.id === 'battery-ultracell-12v-200ah')!;
-        const capacityPerBattery = selectedBattery.capacity_wh || 2400;
+        selectedBattery = CATALOG.find(item => item.id === 'battery-eco-worthy-12v-100ah-lfp')!;
+        const capacityPerBattery = selectedBattery.capacity_wh || 1280;
         nBatteries = Math.ceil(res.battWh / capacityPerBattery);
       } else if (res.systemVoltage === 24) {
         selectedBattery = CATALOG.find(item => item.id === 'battery-pylontech-24v-100ah')!;
@@ -240,13 +251,7 @@ export function selectEquipment(params: {
       nBatteries = numSeries * numParallel;
     }
 
-    bom.push({
-      category: 'battery',
-      description: `${selectedBattery.brand} ${selectedBattery.model} (${selectedBattery.sku})`,
-      quantity: nBatteries,
-      unit_price_usd: selectedBattery.unit_price_usd,
-      line_total_usd: nBatteries * selectedBattery.unit_price_usd
-    });
+    bom.push(toBomItem(selectedBattery, nBatteries));
 
     // 3. Inverter Charger selection
     let inverter: CatalogItem;
@@ -268,24 +273,19 @@ export function selectEquipment(params: {
       }
     }
 
-    bom.push({
-      category: 'inverter_offgrid',
-      description: `${inverter.brand} ${inverter.model} (Inversor Híbrido con MPPT incorporado)`,
-      quantity: 1,
-      unit_price_usd: inverter.unit_price_usd,
-      line_total_usd: inverter.unit_price_usd
-    });
+    const inverterQty = Math.max(1, Math.ceil(res.inverterW / (inverter.power_w || 5000)));
+    bom.push(toBomItem(
+      inverter,
+      inverterQty,
+      `${inverter.brand} ${inverter.model} (Inversor Hibrido con MPPT incorporado)`,
+      inverterQty > 1 ? 'Configuracion en paralelo sujeta a validacion de ingenieria y compatibilidad del fabricante.' : undefined
+    ));
 
     // 4. Standalone MPPT (only added if solar array exceeds inverter MPPT capacity)
-    if (res.controllerA > (inverter.current_a || 40)) {
-      const extraMppt = CATALOG.find(item => item.category === 'charge_controller' && item.current_a! >= (res.controllerA - inverter.current_a!)) || CATALOG.find(item => item.id === 'mppt-srne-60a')!;
-      bom.push({
-        category: 'charge_controller',
-        description: `Controlador MPPT Adicional: ${extraMppt.brand} ${extraMppt.model} (${extraMppt.sku})`,
-        quantity: 1,
-        unit_price_usd: extraMppt.unit_price_usd,
-        line_total_usd: extraMppt.unit_price_usd
-      });
+    const embeddedControllerA = (inverter.current_a || 40) * inverterQty;
+    if (res.controllerA > embeddedControllerA) {
+      const extraMppt = CATALOG.find(item => item.category === 'charge_controller' && item.current_a! >= (res.controllerA - embeddedControllerA)) || CATALOG.find(item => item.id === 'mppt-srne-60a')!;
+      bom.push(toBomItem(extraMppt, 1, `Controlador MPPT Adicional: ${extraMppt.brand} ${extraMppt.model} (${extraMppt.sku})`));
     }
 
     // 5. Structure
@@ -294,57 +294,27 @@ export function selectEquipment(params: {
       ? CATALOG.find(item => item.id === 'structure-2p-roof')!
       : CATALOG.find(item => item.id === 'structure-4p-ground')!;
     const structureQty = structuresNeeded <= 1 && nPanels <= 2 ? 1 : structuresNeeded;
-    bom.push({
-      category: 'mounting',
-      description: `${structureItem.brand} ${structureItem.model}`,
-      quantity: structureQty,
-      unit_price_usd: structureItem.unit_price_usd,
-      line_total_usd: structureQty * structureItem.unit_price_usd
-    });
+    bom.push(toBomItem(structureItem, structureQty, `${structureItem.brand} ${structureItem.model}`));
 
     // 6. Protections
     const prot = CATALOG.find(item => item.id === 'protection-cabinet')!;
-    bom.push({
-      category: 'protection',
-      description: `${prot.brand} ${prot.model}`,
-      quantity: 1,
-      unit_price_usd: prot.unit_price_usd,
-      line_total_usd: prot.unit_price_usd
-    });
+    bom.push(toBomItem(prot, 1, `${prot.brand} ${prot.model}`));
 
     // 7. Wiring
     const wire = CATALOG.find(item => item.id === 'cabling-kit-solar')!;
     const wireQty = Math.max(1, Math.ceil(nPanels / 4));
-    bom.push({
-      category: 'wiring',
-      description: `${wire.brand} ${wire.model}`,
-      quantity: wireQty,
-      unit_price_usd: wire.unit_price_usd,
-      line_total_usd: wireQty * wire.unit_price_usd
-    });
+    bom.push(toBomItem(wire, wireQty, `${wire.brand} ${wire.model}`));
 
     // 8. Monitoring Wifi (Highly premium inclusion)
     const monitor = CATALOG.find(item => item.id === 'monitoring-wifi')!;
-    bom.push({
-      category: 'monitoring',
-      description: `${monitor.brand} ${monitor.model}`,
-      quantity: 1,
-      unit_price_usd: monitor.unit_price_usd,
-      line_total_usd: monitor.unit_price_usd
-    });
+    bom.push(toBomItem(monitor, 1, `${monitor.brand} ${monitor.model}`));
 
   } else if (params.systemType === 'grid_tied' && params.gridtiedResult) {
     const res = params.gridtiedResult;
 
     // 1. Panels selection
     const panel = CATALOG.find(item => item.id === 'panel-jinko-550')!;
-    bom.push({
-      category: 'panel',
-      description: `${panel.brand} ${panel.model} (${panel.sku})`,
-      quantity: res.nPanels,
-      unit_price_usd: panel.unit_price_usd,
-      line_total_usd: res.nPanels * panel.unit_price_usd
-    });
+    bom.push(toBomItem(panel, res.nPanels));
 
     // 2. Inverter selection (Grid-Tied)
     let selectedInv = CATALOG.find(item => item.id === 'inverter-grid-growatt-2kw')!;
@@ -357,13 +327,13 @@ export function selectEquipment(params: {
       selectedInv = CATALOG.find(item => item.id === 'inverter-grid-growatt-10kw')!;
     }
 
-    bom.push({
-      category: 'inverter_grid',
-      description: `${selectedInv.brand} ${selectedInv.model} (${selectedInv.sku})`,
-      quantity: 1,
-      unit_price_usd: selectedInv.unit_price_usd,
-      line_total_usd: selectedInv.unit_price_usd
-    });
+    const gridInvQty = Math.max(1, Math.ceil(invWNeeded / (selectedInv.power_w || 10000)));
+    bom.push(toBomItem(
+      selectedInv,
+      gridInvQty,
+      `${selectedInv.brand} ${selectedInv.model} (${selectedInv.sku})`,
+      gridInvQty > 1 ? 'Proyecto comercial sobre 10 kW: requiere validacion trifasica, protecciones y condiciones de interconexion.' : undefined
+    ));
 
     // 3. Structure
     const structuresNeeded = Math.ceil(res.nPanels / 4);
@@ -371,34 +341,16 @@ export function selectEquipment(params: {
       ? CATALOG.find(item => item.id === 'structure-2p-roof')!
       : CATALOG.find(item => item.id === 'structure-4p-ground')!;
     const structureQty = structuresNeeded <= 1 && res.nPanels <= 2 ? 1 : structuresNeeded;
-    bom.push({
-      category: 'mounting',
-      description: `${structureItem.brand} ${structureItem.model}`,
-      quantity: structureQty,
-      unit_price_usd: structureItem.unit_price_usd,
-      line_total_usd: structureQty * structureItem.unit_price_usd
-    });
+    bom.push(toBomItem(structureItem, structureQty, `${structureItem.brand} ${structureItem.model}`));
 
     // 4. Protections
     const prot = CATALOG.find(item => item.id === 'protection-cabinet')!;
-    bom.push({
-      category: 'protection',
-      description: `${prot.brand} ${prot.model}`,
-      quantity: 1,
-      unit_price_usd: prot.unit_price_usd,
-      line_total_usd: prot.unit_price_usd
-    });
+    bom.push(toBomItem(prot, 1, `${prot.brand} ${prot.model}`));
 
     // 5. Wiring
     const wire = CATALOG.find(item => item.id === 'cabling-kit-solar')!;
     const wireQty = Math.max(1, Math.ceil(res.nPanels / 4));
-    bom.push({
-      category: 'wiring',
-      description: `${wire.brand} ${wire.model}`,
-      quantity: wireQty,
-      unit_price_usd: wire.unit_price_usd,
-      line_total_usd: wireQty * wire.unit_price_usd
-    });
+    bom.push(toBomItem(wire, wireQty, `${wire.brand} ${wire.model}`));
   }
 
   return bom;
