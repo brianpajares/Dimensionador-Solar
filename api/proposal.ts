@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
-import { sendJson } from './_shared';
+import { sendJson } from './_shared.js';
 
 let ai: GoogleGenAI | null = null;
 if (process.env.GEMINI_API_KEY) {
@@ -60,4 +60,3 @@ export default async function handler(req: any, res: any) {
     sendJson(res, 500, { error: 'Fallo al redactar la propuesta tecnica: ' + err.message });
   }
 }
-
